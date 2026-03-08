@@ -1,62 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
-    
-    <!-- 
-      FIX 1: Main App Theme. 
-      Changed parent to "NoActionBar" to fix the crash when calling setSupportActionBar() in MainActivity.
-    -->
-    <style name="Theme.HFS" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <!-- Brand Colors -->
-        <item name="colorPrimary">@color/hfs_primary_blue</item>
-        <item name="colorPrimaryVariant">@color/hfs_primary_dark</item>
-        <item name="colorOnPrimary">@color/white</item>
+
+    <!-- Base application theme -->
+    <style name="Theme.CloudNest" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Primary brand color -->
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryVariant">@color/colorPrimaryDark</item>
+        <item name="colorOnPrimary">@android:color/white</item>
         
-        <!-- Status Bar & Window Background -->
-        <item name="android:statusBarColor">@color/hfs_background_dark</item>
-        <item name="android:windowBackground">@color/hfs_background_dark</item>
-
-        <!-- 
-          FIX 2: Alert Dialog Theme.
-          Forces pop-ups to use a dark background so the white text is visible.
-        -->
-        <item name="android:alertDialogTheme">@style/Theme.HFS.Dialog</item>
-        <item name="alertDialogTheme">@style/Theme.HFS.Dialog</item>
-        <item name="materialAlertDialogTheme">@style/Theme.HFS.Dialog</item>
-
-        <!-- Compatibility attributes for previous build errors -->
-        <item name="android:textColorPrimary">@color/dt_textColor</item>
-        <item name="android:colorBackground">@color/dt_backgroundColor</item>
+        <!-- Secondary brand color -->
+        <item name="colorSecondary">@color/colorAccent</item>
+        <item name="colorSecondaryVariant">@color/colorAccent</item>
+        <item name="colorOnSecondary">@android:color/black</item>
+        
+        <!-- Status bar color -->
+        <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
+        
+        <!-- Surface and Background colors -->
+        <item name="colorSurface">@android:color/white</item>
+        <item name="android:colorBackground">#F5F5F5</item>
     </style>
 
-    <!-- Splash Screen Theme (No Action Bar) -->
-    <style name="Theme.HFS.NoActionBar" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/hfs_primary_blue</item>
-        <item name="colorPrimaryVariant">@color/hfs_primary_dark</item>
-        <item name="colorOnPrimary">@color/white</item>
-        <item name="android:statusBarColor">@color/hfs_background_dark</item>
-        <item name="android:windowBackground">@color/hfs_background_dark</item>
-    </style>
-
-    <!-- 
-      FIX 3: Custom Dialog Style.
-      Sets background to HFS Dark Surface and text to White.
-    -->
-    <style name="Theme.HFS.Dialog" parent="Theme.MaterialComponents.DayNight.Dialog.Alert">
-        <item name="android:background">@color/hfs_surface_dark</item>
-        <item name="android:textColorPrimary">@color/white</item>
-        <item name="android:textColor">@color/white</item>
-        <item name="colorAccent">@color/hfs_primary_blue</item>
-        <item name="buttonBarPositiveButtonStyle">@style/Widget.MaterialComponents.Button.TextButton</item>
-        <item name="buttonBarNegativeButtonStyle">@style/Widget.MaterialComponents.Button.TextButton</item>
-    </style>
-
-    <!-- Lock Screen Overlay Style -->
-    <style name="Theme.HFS.LockOverlay" parent="Theme.HFS.NoActionBar">
-        <item name="android:windowIsTranslucent">true</item>
-        <item name="android:windowBackground">@android:color/transparent</item>
-        <item name="android:windowContentOverlay">@null</item>
-        <item name="android:windowNoTitle">true</item>
-        <item name="android:windowIsFloating">false</item>
-        <item name="android:backgroundDimEnabled">true</item>
+    <!-- Theme for Splash Screen (No Action Bar) -->
+    <style name="Theme.CloudNest.NoActionBar" parent="Theme.CloudNest">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
     </style>
 
 </resources>
