@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Base application theme -->
+    <!-- Base application theme (DayNight allows automatic Dark Mode switching) -->
     <style name="Theme.CloudNest" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <!-- Primary brand color -->
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryVariant">@color/colorPrimaryDark</item>
         <item name="colorOnPrimary">@android:color/white</item>
         
-        <!-- Secondary brand color -->
+        <!-- Secondary brand color (Used for FAB and Toggles) -->
         <item name="colorSecondary">@color/colorAccent</item>
         <item name="colorSecondaryVariant">@color/colorAccent</item>
         <item name="colorOnSecondary">@android:color/black</item>
@@ -17,8 +17,16 @@
         <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
         
         <!-- Surface and Background colors -->
-        <item name="colorSurface">@android:color/white</item>
+        <item name="colorSurface">?android:attr/colorBackground</item>
         <item name="android:colorBackground">#F5F5F5</item>
+
+        <!-- Text Colors: Fixes invisible text in various modes -->
+        <item name="android:textColorPrimary">?attr/colorOnSurface</item>
+        <item name="android:textColorSecondary">@android:color/darker_gray</item>
+
+        <!-- Toolbar Icon & Menu Colors: Fixes the white-on-white arrow glitch -->
+        <item name="colorControlNormal">@android:color/white</item>
+        <item name="actionMenuTextColor">@android:color/white</item>
     </style>
 
     <!-- Theme for Splash Screen (No Action Bar) -->
@@ -26,5 +34,11 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
     </style>
+
+    <!-- Overlay for the Toolbar to ensure icons are readable -->
+    <style name="Theme.CloudNest.AppBarOverlay" parent="ThemeOverlay.AppCompat.Dark.ActionBar" />
+
+    <!-- Overlay for the Toolbar Popup Menu -->
+    <style name="Theme.CloudNest.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
 
 </resources>
