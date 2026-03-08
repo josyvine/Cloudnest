@@ -16,6 +16,13 @@
         android:title="Upload"
         app:showAsAction="always" />
 
+    <!-- NEW: Add to Preset Folder (Auto-Backup) -->
+    <item
+        android:id="@+id/action_preset"
+        android:icon="@android:drawable/ic_menu_add"
+        android:title="Add to Preset"
+        app:showAsAction="always" />
+
     <!-- Share Selected Items -->
     <item
         android:id="@+id/action_share"
