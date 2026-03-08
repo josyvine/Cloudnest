@@ -37,25 +37,8 @@
         <item name="appHeaderTextColor">@color/amoled_headerTextColor</item>
     </style>
 
-    <!-- 4. Nordic Theme -->
-    <style name="AppTheme.Nordic" parent="AppThemeBase">
-        <item name="appPrimaryColor">@color/nordic_colorPrimary</item>
-        <item name="appBackgroundColor">@color/nordic_backgroundColor</item>
-        <item name="appTextColor">@color/nordic_textColor</item>
-        <item name="appHeaderTextColor">@color/nordic_headerTextColor</item>
-    </style>
-
-    <!-- 5. Solarized Theme -->
-    <style name="AppTheme.Solarized" parent="AppThemeBase">
-        <item name="appPrimaryColor">@color/solarized_colorPrimary</item>
-        <item name="appBackgroundColor">@color/solarized_backgroundColor</item>
-        <item name="appTextColor">@color/solarized_textColor</item>
-        <item name="appHeaderTextColor">@color/solarized_headerTextColor</item>
-    </style>
-
     <!-- Special Dark Theme for MainActivity WebView background -->
     <style name="AppTheme.MainActivity" parent="android:Theme.DeviceDefault.NoActionBar.Fullscreen">
         <item name="android:windowBackground">#071023</item>
     </style>
 </resources>
-
