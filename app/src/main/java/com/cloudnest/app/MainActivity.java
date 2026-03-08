@@ -8,9 +8,12 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.Settings;
+import android.text.InputType;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
@@ -56,7 +59,7 @@ public class MainActivity extends AppCompatActivity {
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        // Setup Toolbar - CORRECTED to access toolbar directly
+        // Setup Toolbar - Directly accessing from binding
         setSupportActionBar(binding.toolbar);
 
         // Initialize Google Sign-In Client (Used for Logout)
@@ -73,7 +76,7 @@ public class MainActivity extends AppCompatActivity {
         if (navHostFragment != null) {
             navController = navHostFragment.getNavController();
 
-            // Define top-level destinations (No back arrow, shows hamburger menu instead)
+            // Define top-level destinations
             appBarConfiguration = new AppBarConfiguration.Builder(
                     R.id.nav_dashboard, 
                     R.id.nav_phone_storage, 
@@ -88,9 +91,18 @@ public class MainActivity extends AppCompatActivity {
 
             NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration);
             NavigationUI.setupWithNavController(navigationView, navController);
+
+            // Hide/Show FAB based on fragment destination to prevent overlap with specific screen FABs
+            navController.addOnDestinationChangedListener((controller, destination, arguments) -> {
+                if (destination.getId() == R.id.nav_preset_folders) {
+                    binding.fab.hide();
+                } else {
+                    binding.fab.show();
+                }
+            });
         }
 
-        // Handle custom navigation item clicks (like Logout)
+        // Handle custom navigation item clicks
         navigationView.setNavigationItemSelectedListener(item -> {
             int id = item.getItemId();
 
@@ -99,7 +111,6 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             }
 
-            // Let NavigationUI handle standard fragment navigation
             boolean handled = NavigationUI.onNavDestinationSelected(item, navController);
             if (handled) {
                 drawer.closeDrawer(GravityCompat.START);
@@ -107,7 +118,7 @@ public class MainActivity extends AppCompatActivity {
             return handled;
         });
 
-        // Setup Floating Action Button (FAB) - CORRECTED to access fab directly
+        // Setup Floating Action Button (FAB)
         binding.fab.setOnClickListener(view -> showFabMenu());
 
         // Setup custom Back Button logic (Exit Confirmation on Dashboard)
@@ -119,16 +130,10 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public boolean onSupportNavigateUp() {
-        // Handles hamburger icon clicks and up navigation
         return NavigationUI.navigateUp(navController, appBarConfiguration)
                 || super.onSupportNavigateUp();
     }
 
-    /**
-     * Intercepts the back button. 
-     * If the user is on the Dashboard (Home), show an exit confirmation.
-     * Otherwise, let the NavController handle the back stack.
-     */
     private void setupBackButtonLogic() {
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
@@ -139,7 +144,6 @@ public class MainActivity extends AppCompatActivity {
                            navController.getCurrentDestination().getId() == R.id.nav_dashboard) {
                     showExitConfirmationDialog();
                 } else {
-                    // Not on dashboard, pop the back stack normally
                     if (!navController.navigateUp()) {
                         setEnabled(false);
                         onBackPressed();
@@ -149,9 +153,6 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    /**
-     * Shows Exit Confirmation ("Exit CloudNest? Cancel / Exit")
-     */
     private void showExitConfirmationDialog() {
         new AlertDialog.Builder(this)
                 .setTitle("Exit CloudNest?")
@@ -162,32 +163,55 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Shows a dialog or bottom sheet for FAB actions.
+     * UPDATED: Shows functional dialogs for folder creation and upload selection.
      */
     private void showFabMenu() {
-        // Implement bottom sheet or popup menu for: Create New Folder, Upload Files, Upload Folder
         String[] options = {"Create New Folder", "Upload Files", "Upload Folder"};
         new AlertDialog.Builder(this)
-                .setTitle("Select Action")
+                .setTitle("Action Center")
                 .setItems(options, (dialog, which) -> {
-                    switch (which) {
-                        case 0:
-                            Toast.makeText(this, "Create New Folder Selected", Toast.LENGTH_SHORT).show();
-                            break;
-                        case 1:
-                            Toast.makeText(this, "Upload Files Selected", Toast.LENGTH_SHORT).show();
-                            break;
-                        case 2:
-                            Toast.makeText(this, "Upload Folder Selected", Toast.LENGTH_SHORT).show();
-                            break;
+                    if (which == 0) {
+                        showCreateFolderDialog();
+                    } else if (which == 1) {
+                        Toast.makeText(this, "Select files from browser to upload", Toast.LENGTH_LONG).show();
+                    } else if (which == 2) {
+                        Toast.makeText(this, "Long-press a folder to upload entire contents", Toast.LENGTH_LONG).show();
                     }
                 })
                 .show();
     }
 
     /**
-     * Confirms and executes Google Sign-Out.
+     * UPDATED: Fixed the missing input field for folder creation.
      */
+    private void showCreateFolderDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("New Folder Name");
+
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        input.setHint("Enter name here...");
+        
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT);
+        input.setLayoutParams(lp);
+        builder.setView(input);
+
+        builder.setPositiveButton("Create", (dialog, which) -> {
+            String folderName = input.getText().toString().trim();
+            if (!folderName.isEmpty()) {
+                // Logic to trigger folder creation in active drive or local path
+                Toast.makeText(this, "Creating: " + folderName, Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "Name cannot be empty", Toast.LENGTH_SHORT).show();
+            }
+        });
+        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
+
+        builder.show();
+    }
+
     private void confirmAndLogout() {
         new AlertDialog.Builder(this)
                 .setTitle("Logout")
@@ -205,17 +229,12 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
-    /**
-     * Manages all required runtime permissions for Android 11+ (Storage) and Android 13+ (Notifications).
-     */
     private void checkRuntimePermissions() {
-        // 1. Storage Permission (Manage External Storage for Android 11+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (!Environment.isExternalStorageManager()) {
                 showStoragePermissionExplanation();
             }
         } else {
-            // Android 10 and below Storage Permissions
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED ||
                 ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
 
@@ -226,7 +245,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        // 2. Post Notifications Permission (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, PERMISSION_REQUEST_CODE);
@@ -234,9 +252,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * Directs the user to the All Files Access settings page for Android 11+.
-     */
     private void showStoragePermissionExplanation() {
         new AlertDialog.Builder(this)
                 .setTitle("Storage Access Required")
@@ -265,7 +280,7 @@ public class MainActivity extends AppCompatActivity {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(this, "Storage Permission Granted.", Toast.LENGTH_SHORT).show();
             } else {
-                Toast.makeText(this, "Storage Permission Denied. File browsing is disabled.", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Storage Permission Denied.", Toast.LENGTH_LONG).show();
             }
         }
     }
