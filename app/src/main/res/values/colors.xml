@@ -15,6 +15,10 @@
     <color name="white">#FFFFFF</color>
     <color name="black">#000000</color>
 
+    <!-- MISSING COLORS FIXED HERE -->
+    <color name="hfs_primary_blue">#2196F3</color>
+    <color name="nav_unselected">#9E9E9E</color>
+
     <!-- Amoled Theme Colors -->
     <color name="amoled_colorPrimary">#2196F3</color>
     <color name="amoled_backgroundColor">#000000</color>
