@@ -1,22 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
-    <!-- Root path allows access to all storage areas including internal and SD Card -->
+    <!-- FIXED: Allows access to the system root for SD card and Internal storage browsing -->
     <root-path
         name="root"
         path="." />
 
-    <!-- Exposes the app's internal cache folder for offline viewing of Drive files -->
-    <external-path 
-        name="offline_cache" 
-        path="Android/data/com.cloudnest.app/files/OfflineCache" />
+    <!-- FIXED: Added cache-path. Without this, the app CRASHES when previewing files (Glitch 4) -->
+    <cache-path
+        name="preview_cache"
+        path="." />
 
-    <!-- Exposes the main app storage directory if needed for file sharing -->
-    <external-path 
-        name="app_storage" 
-        path="Android/data/com.cloudnest.app/files/" />
+    <!-- FIXED: Maps the internal files directory for the Offline Cache feature -->
+    <files-path
+        name="internal_files"
+        path="." />
 
-    <!-- Legacy compatibility for standard external storage -->
+    <!-- Allows access to the standard external storage paths for compatibility -->
     <external-path
         name="external_files"
+        path="." />
+
+    <!-- Specific mapping for your app's external data folder -->
+    <external-files-path
+        name="app_external_files"
         path="." />
 </paths>
