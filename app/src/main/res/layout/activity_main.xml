@@ -8,7 +8,7 @@
     android:fitsSystemWindows="true"
     tools:openDrawer="start">
 
-    <!-- The main content area using CoordinatorLayout to manage overlapping components like FAB -->
+    <!-- Main Content Area -->
     <androidx.coordinatorlayout.widget.CoordinatorLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent">
@@ -27,7 +27,7 @@
 
         </com.google.android.material.appbar.AppBarLayout>
 
-        <!-- Container for all Fragments -->
+        <!-- NavHost container for all screen fragments -->
         <fragment
             android:id="@+id/nav_host_fragment_content_main"
             android:name="androidx.navigation.fragment.NavHostFragment"
@@ -38,9 +38,9 @@
             app:navGraph="@navigation/nav_graph" />
 
         <!-- 
-            Floating Action Button for creating folders/uploads.
-            Positioned strictly at the bottom-right with standard margins 
-            to prevent overlaying top-menu icons.
+            Main Floating Action Button.
+            Positioned at the bottom-end with margins to prevent overlap 
+            with navigation or system bars.
         -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fab"
@@ -49,14 +49,17 @@
             android:layout_gravity="bottom|end"
             android:layout_marginEnd="24dp"
             android:layout_marginBottom="24dp"
-            android:contentDescription="Add Folder or Upload"
+            android:contentDescription="Add New Folder or Upload"
             app:backgroundTint="?attr/colorSecondary"
             app:srcCompat="@android:drawable/ic_input_add"
             app:tint="@android:color/white" />
 
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 
-    <!-- The Side Navigation Drawer -->
+    <!-- 
+        Side Navigation Drawer.
+        Fixed crash by explicitly setting tints to use fixed theme attributes.
+    -->
     <com.google.android.material.navigation.NavigationView
         android:id="@+id/nav_view"
         android:layout_width="wrap_content"
@@ -64,6 +67,9 @@
         android:layout_gravity="start"
         android:fitsSystemWindows="true"
         app:headerLayout="@layout/nav_header_main"
-        app:menu="@menu/drawer_menu" />
+        app:menu="@menu/drawer_menu"
+        app:itemIconTint="?attr/colorOnSurface"
+        app:itemTextColor="?attr/colorOnSurface"
+        app:itemBackground="@android:color/transparent" />
 
 </androidx.drawerlayout.widget.DrawerLayout>
