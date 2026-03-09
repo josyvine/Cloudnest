@@ -3,28 +3,10 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="?attr/colorSurface"
     android:padding="16dp">
 
-    <!-- List of active uploads -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recyclerViewUploads"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_above="@id/btnClearCompleted"
-        android:clipToPadding="false"
-        android:paddingBottom="16dp" />
-
-    <!-- Button to clean up successful/failed uploads from the UI -->
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnClearCompleted"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
-        android:text="Clear Completed &amp; Failed"
-        app:icon="@android:drawable/ic_menu_delete"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
-
-    <!-- Empty State Label -->
+    <!-- Empty State Label - centered in screen -->
     <TextView
         android:id="@+id/tvEmptyQueue"
         android:layout_width="wrap_content"
@@ -32,7 +14,31 @@
         android:layout_centerInParent="true"
         android:text="No active uploads."
         android:textSize="16sp"
-        android:textColor="@android:color/darker_gray"
+        android:textColor="?android:attr/textColorSecondary"
         android:visibility="gone" />
+
+    <!-- List of active uploads -->
+    <!-- Increased paddingBottom to 180dp to ensure items scroll past the Clear button and the FAB -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerViewUploads"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingBottom="180dp"
+        android:scrollbars="vertical" />
+
+    <!-- Button to clean up successful/failed uploads -->
+    <!-- Updated: High bottom margin (100dp) to float above the Main FAB (Fixes Glitch 7/8) -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnClearCompleted"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="100dp"
+        android:padding="12dp"
+        android:text="Clear Completed &amp; Failed"
+        android:textAllCaps="false"
+        app:icon="@android:drawable/ic_menu_delete"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
 
 </RelativeLayout>
