@@ -129,6 +129,7 @@ public class FileBrowserAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
             case "zip": case "rar": case "7z": return R.drawable.ic_file_zip;
             case "html": case "xml": case "js": case "py": case "java": case "php": return R.drawable.ic_file_code;
             case "doc": case "docx": return R.drawable.ic_file_word;
+            case "jpg": case "jpeg": case "png": case "gif": return R.drawable.ic_file_image;
             default: return R.drawable.ic_file_generic;
         }
     }
@@ -153,10 +154,11 @@ public class FileBrowserAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
                 binding.tvFileDetails.setText(String.format("%.2f MB", file.getSize() / 1024.0 / 1024.0));
                 
                 // Load Thumbnail if it's media, else set specific file icon
-                String pathOrUrl = file.getDriveId() != null ? file.getThumbnailUrl() : file.getPath();
+                // Using Drive thumbnail link for cloud, or local path for phone files
+                Object imageSource = (file.getDriveId() != null) ? file.getThumbnailUrl() : file.getPath();
                 
                 Glide.with(itemView.getContext())
-                        .load(pathOrUrl)
+                        .load(imageSource)
                         .placeholder(getFileIcon(file.getName()))
                         .error(getFileIcon(file.getName()))
                         .transition(DrawableTransitionOptions.withCrossFade())
@@ -187,10 +189,11 @@ public class FileBrowserAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
             if (file.isDirectory()) {
                 binding.ivGridIcon.setImageResource(R.drawable.ic_folder);
             } else {
-                String pathOrUrl = file.getDriveId() != null ? file.getThumbnailUrl() : file.getPath();
+                // Load Thumbnail for Grid
+                Object imageSource = (file.getDriveId() != null) ? file.getThumbnailUrl() : file.getPath();
 
                 Glide.with(itemView.getContext())
-                        .load(pathOrUrl)
+                        .load(imageSource)
                         .placeholder(getFileIcon(file.getName()))
                         .error(getFileIcon(file.getName()))
                         .transition(DrawableTransitionOptions.withCrossFade())
