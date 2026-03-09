@@ -19,6 +19,7 @@ import java.util.UUID;
  * Adapter for the Upload Manager Queue.
  * Displays file names, progress bars, and status icons for background transfers.
  * Handles "Cancel" and "Retry" button clicks.
+ * UPDATED: Displays real-time network speed and file count details.
  */
 public class UploadQueueAdapter extends RecyclerView.Adapter<UploadQueueAdapter.ViewHolder> {
 
@@ -82,7 +83,16 @@ public class UploadQueueAdapter extends RecyclerView.Adapter<UploadQueueAdapter.
 
             switch (item.getStatus()) {
                 case IN_PROGRESS:
-                    binding.tvUploadStatus.setText("Uploading... " + item.getProgress() + "%");
+                    // Show detailed progress and speed if available
+                    String statusText = "Uploading... " + item.getProgress() + "%";
+                    if (item.getDetails() != null && !item.getDetails().isEmpty()) {
+                        statusText = item.getDetails() + " • " + item.getProgress() + "%";
+                    }
+                    if (item.getSpeed() != null && !item.getSpeed().isEmpty()) {
+                        statusText += " • " + item.getSpeed();
+                    }
+                    
+                    binding.tvUploadStatus.setText(statusText);
                     binding.tvUploadStatus.setTextColor(Color.DKGRAY);
                     binding.btnCancelUpload.setVisibility(View.VISIBLE);
                     binding.progressBarUpload.setIndeterminate(false);
