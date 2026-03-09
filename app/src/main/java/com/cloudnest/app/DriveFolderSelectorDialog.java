@@ -1,5 +1,6 @@
 package com.cloudnest.app;
 
+import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Context;
 import android.os.Bundle;
@@ -9,6 +10,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -26,6 +28,7 @@ import com.google.api.services.drive.model.File;
 import com.google.api.services.drive.model.FileList;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Stack;
 import java.util.concurrent.ExecutorService;
@@ -34,6 +37,7 @@ import java.util.concurrent.Executors;
 /**
  * Custom Dialog for selecting a target folder on Google Drive.
  * Addresses Glitch 5 by allowing users to choose the destination path.
+ * UPDATED: Added New Folder creation and Life-cycle crash protection.
  */
 public class DriveFolderSelectorDialog extends DialogFragment {
 
@@ -46,6 +50,7 @@ public class DriveFolderSelectorDialog extends DialogFragment {
     private RecyclerView recyclerView;
     private ProgressBar progressBar;
     private TextView tvPath;
+    private TextView tvEmptyMsg; // Added for Glitch 3
     private String currentFolderId = "root";
     private String currentFolderName = "My Drive";
     private Stack<FolderRef> navStack = new Stack<>();
@@ -71,8 +76,11 @@ public class DriveFolderSelectorDialog extends DialogFragment {
         recyclerView = v.findViewById(R.id.rv_folder_list);
         progressBar = v.findViewById(R.id.pb_loading_folders);
         tvPath = v.findViewById(R.id.tv_current_path);
+        tvEmptyMsg = v.findViewById(R.id.tv_empty_folder_msg); // Fix Glitch 3
+        
         Button btnSelect = v.findViewById(R.id.btn_select_this_folder);
         Button btnBack = v.findViewById(R.id.btn_folder_back);
+        Button btnNewFolder = v.findViewById(R.id.btn_create_new_dir); // Fix Glitch 5
 
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
 
@@ -97,7 +105,58 @@ public class DriveFolderSelectorDialog extends DialogFragment {
             }
         });
 
+        // FIXED FOR GLITCH 5: Initialize New Folder button
+        if (btnNewFolder != null) {
+            btnNewFolder.setOnClickListener(view -> showCreateDirDialog());
+        }
+
         return v;
+    }
+
+    /**
+     * FIXED FOR GLITCH 5: Dialog to input new directory name
+     */
+    private void showCreateDirDialog() {
+        EditText input = new EditText(getContext());
+        input.setHint("Enter folder name");
+        
+        new AlertDialog.Builder(getContext())
+                .setTitle("New Folder")
+                .setView(input)
+                .setPositiveButton("Create", (dialog, which) -> {
+                    String folderName = input.getText().toString().trim();
+                    if (!folderName.isEmpty()) {
+                        createNewFolder(folderName);
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    /**
+     * FIXED FOR GLITCH 5: Actual API call to create directory
+     */
+    private void createNewFolder(String name) {
+        progressBar.setVisibility(View.VISIBLE);
+        executor.execute(() -> {
+            try {
+                File meta = new File();
+                meta.setName(name);
+                meta.setMimeType("application/vnd.google-apps.folder");
+                meta.setParents(Collections.singletonList(currentFolderId));
+                
+                driveService.files().create(meta).execute();
+                
+                // Refresh the list after creation
+                if (isAdded()) {
+                    requireActivity().runOnUiThread(() -> loadFolders(currentFolderId, currentFolderName));
+                }
+            } catch (Exception e) {
+                if (isAdded()) {
+                    requireActivity().runOnUiThread(() -> Toast.makeText(getContext(), "Failed to create folder", Toast.LENGTH_SHORT).show());
+                }
+            }
+        });
     }
 
     private void loadFolders(String folderId, String folderName) {
@@ -105,6 +164,7 @@ public class DriveFolderSelectorDialog extends DialogFragment {
         currentFolderName = folderName;
         tvPath.setText("Drive > " + folderName);
         progressBar.setVisibility(View.VISIBLE);
+        if (tvEmptyMsg != null) tvEmptyMsg.setVisibility(View.GONE);
 
         executor.execute(() -> {
             try {
@@ -118,16 +178,24 @@ public class DriveFolderSelectorDialog extends DialogFragment {
                 if (folders == null) folders = new ArrayList<>();
 
                 final List<File> finalFolders = folders;
+                
+                // FIXED CRASH: Check isAdded() before UI updates
                 if (isAdded()) {
                     requireActivity().runOnUiThread(() -> {
                         progressBar.setVisibility(View.GONE);
+                        if (tvEmptyMsg != null) {
+                            tvEmptyMsg.setVisibility(finalFolders.isEmpty() ? View.VISIBLE : View.GONE);
+                        }
                         recyclerView.setAdapter(new SimpleFolderAdapter(finalFolders));
                     });
                 }
 
             } catch (Exception e) {
                 if (isAdded()) {
-                    requireActivity().runOnUiThread(() -> Toast.makeText(getContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                    requireActivity().runOnUiThread(() -> {
+                        progressBar.setVisibility(View.GONE);
+                        Toast.makeText(getContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    });
                 }
             }
         });
