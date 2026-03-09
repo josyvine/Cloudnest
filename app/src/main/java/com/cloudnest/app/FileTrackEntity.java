@@ -14,7 +14,11 @@ import androidx.room.PrimaryKey;
  */
 @Entity(tableName = "file_tracking",
         // Create an index on the localPath for faster lookups to prevent duplicates.
-        indices = {@Index(value = "local_path", unique = true)},
+        // Added index on drive_account_id to prevent full table scans on foreign key modifications.
+        indices = {
+            @Index(value = "local_path", unique = true),
+            @Index("drive_account_id")
+        },
         // Establish a foreign key relationship with the drive_accounts table.
         foreignKeys = @ForeignKey(entity = DriveAccountEntity.class,
                                   parentColumns = "email",
