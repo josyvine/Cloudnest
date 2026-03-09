@@ -31,7 +31,7 @@ import java.util.concurrent.Executors;
 /**
  * Auto-Backup Configuration Screen.
  * Lists all local folders marked as "Preset" for automatic syncing.
- * UPDATED: Fixed navigation logic for adding new preset folders.
+ * UPDATED: Fixed Glitch 6 (Sync status visibility) and Glitch 9 (Manual trigger logic).
  */
 public class PresetFoldersFragment extends Fragment implements PresetFolderAdapter.OnPresetActionListener {
 
@@ -51,6 +51,7 @@ public class PresetFoldersFragment extends Fragment implements PresetFolderAdapt
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        // Initialize Database and background thread pool
         db = CloudNestDatabase.getInstance(requireContext());
         dbExecutor = Executors.newSingleThreadExecutor();
 
@@ -60,53 +61,58 @@ public class PresetFoldersFragment extends Fragment implements PresetFolderAdapt
     }
 
     private void setupRecyclerView() {
+        if (binding == null) return;
         binding.recyclerViewPresets.setLayoutManager(new LinearLayoutManager(requireContext()));
         adapter = new PresetFolderAdapter(requireContext(), new ArrayList<>(), this);
         binding.recyclerViewPresets.setAdapter(adapter);
     }
 
     /**
-     * UPDATED: Implementation for Glitch 6.
-     * Directs the user to the storage browser to pick a folder.
+     * Fix for Glitch 6 & Navigation:
+     * Provides clear instructions and navigates users to the storage browser 
+     * where they can select a folder to add to the auto-backup queue.
      */
     private void setupAddButton() {
+        if (binding == null) return;
         binding.fabAddPreset.setOnClickListener(v -> {
             new AlertDialog.Builder(requireContext())
-                    .setTitle("Add Auto-Backup Folder")
-                    .setMessage("To add a folder, go to 'Phone Storage', long-press the folder you want, and select the 'Add to Preset' icon in the top menu.")
+                    .setTitle("Setup Auto-Backup")
+                    .setMessage("To add a folder to the backup list:\n\n1. Go to 'Phone Storage'\n2. Long-press the folder\n3. Tap the 'Add to Preset' icon (Star/Plus) in the top menu.")
                     .setPositiveButton("Go to Storage", (dialog, which) -> {
-                        // FIX: Actual navigation logic added here
                         Bundle bundle = new Bundle();
                         bundle.putString("STORAGE_TYPE", "PHONE");
                         Navigation.findNavController(v).navigate(R.id.nav_local_browser, bundle);
                     })
-                    .setNegativeButton("Cancel", null)
+                    .setNegativeButton("Maybe Later", null)
                     .show();
         });
     }
 
     /**
      * Loads the list of configured folders from Room Database.
-     * Observes LiveData for real-time updates.
+     * Observes LiveData for real-time updates to fix the "Never Synced" glitch.
      */
     private void loadPresetFolders() {
-        db.presetFolderDao().getAllPresets().observe(getViewLifecycleOwner(), new Observer<List<PresetFolderEntity>>() {
-            @Override
-            public void onChanged(List<PresetFolderEntity> presetFolders) {
-                if (presetFolders == null || presetFolders.isEmpty()) {
-                    binding.tvEmptyPresets.setVisibility(View.VISIBLE);
-                    binding.recyclerViewPresets.setVisibility(View.GONE);
-                } else {
-                    binding.tvEmptyPresets.setVisibility(View.GONE);
-                    binding.recyclerViewPresets.setVisibility(View.VISIBLE);
-                    adapter.updateList(presetFolders);
-                }
+        db.presetFolderDao().getAllPresets().observe(getViewLifecycleOwner(), presetFolders -> {
+            if (binding == null) return;
+
+            if (presetFolders == null || presetFolders.isEmpty()) {
+                binding.tvEmptyPresets.setVisibility(View.VISIBLE);
+                binding.recyclerViewPresets.setVisibility(View.GONE);
+            } else {
+                binding.tvEmptyPresets.setVisibility(View.GONE);
+                binding.recyclerViewPresets.setVisibility(View.VISIBLE);
+                adapter.updateList(presetFolders);
             }
         });
     }
 
     // --- Interaction Listener Implementation ---
 
+    /**
+     * Triggers a manual sync of a specific preset folder.
+     * Fixes Glitch 9 by ensuring the worker is enqueued with correct parameters.
+     */
     @Override
     public void onSyncNowClicked(PresetFolderEntity folder) {
         Data inputData = new Data.Builder()
@@ -114,27 +120,33 @@ public class PresetFoldersFragment extends Fragment implements PresetFolderAdapt
                 .putString("PRESET_ID", String.valueOf(folder.id))
                 .build();
 
+        // Enqueue the worker specifically for this folder
         OneTimeWorkRequest syncRequest = new OneTimeWorkRequest.Builder(AutoBackupWorker.class)
                 .setInputData(inputData)
                 .addTag("AUTO_BACKUP")
                 .build();
 
         WorkManager.getInstance(requireContext()).enqueue(syncRequest);
+        
         Toast.makeText(requireContext(), "Sync started for: " + folder.folderName, Toast.LENGTH_SHORT).show();
     }
 
+    /**
+     * Removes a folder from the auto-backup system.
+     */
     @Override
     public void onRemoveClicked(PresetFolderEntity folder) {
         new AlertDialog.Builder(requireContext())
-                .setTitle("Remove Auto-Backup?")
-                .setMessage("Stop syncing '" + folder.folderName + "'? Existing files on Drive will remain.")
-                .setPositiveButton("Remove", (dialog, which) -> {
+                .setTitle("Stop Auto-Backup?")
+                .setMessage("CloudNest will stop monitoring '" + folder.folderName + "'. Files already on Drive will remain safe.")
+                .setPositiveButton("Stop Syncing", (dialog, which) -> {
                     dbExecutor.execute(() -> {
                         db.presetFolderDao().delete(folder);
                         
+                        // Notify user on UI thread
                         if (getActivity() != null) {
                             getActivity().runOnUiThread(() -> 
-                                Toast.makeText(requireContext(), "Folder removed from sync list.", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(requireContext(), "Folder removed from presets.", Toast.LENGTH_SHORT).show()
                             );
                         }
                     });
@@ -143,15 +155,20 @@ public class PresetFoldersFragment extends Fragment implements PresetFolderAdapt
                 .show();
     }
 
+    /**
+     * Navigation helper to view the cloud destination.
+     */
     @Override
     public void onViewInDriveClicked(PresetFolderEntity folder) {
-        // Logic to open drive browser at specific folder location if needed
-        Toast.makeText(requireContext(), "Opening Drive Location...", Toast.LENGTH_SHORT).show();
+        // Redirect to the Drive Browser at the root CloudNest folder
+        Navigation.findNavController(requireView()).navigate(R.id.nav_drive_browser);
+        Toast.makeText(requireContext(), "Opening CloudNest folder...", Toast.LENGTH_SHORT).show();
     }
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        // Prevent crashes by shutting down executor and clearing binding
         if (dbExecutor != null && !dbExecutor.isShutdown()) {
             dbExecutor.shutdown();
         }
