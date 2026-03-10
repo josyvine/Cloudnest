@@ -17,6 +17,7 @@ import java.util.List;
 /**
  * Utility class for Google Drive API operations.
  * Centralizes service initialization, folder search/creation, and quota checks.
+ * UPDATED: Added logic for Permanent Deletion and Trash Management (Glitch 2).
  */
 public class DriveApiHelper {
 
@@ -80,5 +81,21 @@ public class DriveApiHelper {
         long limit = quota.getLimit();
         if (limit == 0) return false;
         return ((double) used / limit) > 0.95;
+    }
+
+    /**
+     * NEW: Permanently deletes a file or folder, bypassing the trash.
+     * FIXES: Glitch 2.
+     */
+    public static void deleteFilePermanently(Drive driveService, String fileId) throws IOException {
+        driveService.files().delete(fileId).execute();
+    }
+
+    /**
+     * NEW: Empties the entire trash for the current user's Drive.
+     * FIXES: Glitch 2.
+     */
+    public static void emptyTrash(Drive driveService) throws IOException {
+        driveService.files().emptyTrash().execute();
     }
 }
