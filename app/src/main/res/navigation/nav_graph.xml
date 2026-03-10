@@ -33,6 +33,13 @@
         android:label="Google Drive"
         tools:layout="@layout/fragment_file_browser" />
 
+    <!-- FIXED FOR GLITCH 2: Added Trash Browser Destination -->
+    <fragment
+        android:id="@+id/nav_trash"
+        android:name="com.cloudnest.app.TrashBrowserFragment"
+        android:label="Trash bin"
+        tools:layout="@layout/fragment_file_browser" />
+
     <!-- 4. Upload Manager -->
     <fragment
         android:id="@+id/nav_upload_manager"
