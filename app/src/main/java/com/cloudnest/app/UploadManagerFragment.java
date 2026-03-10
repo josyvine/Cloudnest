@@ -25,7 +25,7 @@ import java.util.UUID;
  * Upload Queue Manager.
  * Observes background WorkManager tasks tagged with "MANUAL_UPLOAD" or "AUTO_BACKUP".
  * Displays real-time progress bars, file names, and allows cancellation.
- * UPDATED: Fixed Glitch 2 (Speed/Details) and Glitch 7 (Multi-tag tracking).
+ * UPDATED: Fixed multi-tag observation logic to ensure Auto-Detection visibility.
  */
 public class UploadManagerFragment extends Fragment implements UploadQueueAdapter.OnUploadActionClickListener {
 
@@ -71,76 +71,97 @@ public class UploadManagerFragment extends Fragment implements UploadQueueAdapte
     /**
      * Observes LiveData from WorkManager.
      * Updates the UI whenever a background task updates its progress or state.
+     * UPDATED: Unified observation logic to prevent UI lag and missing tasks.
      */
     private void observeUploads() {
-        // FIXED GLITCH 7: We now monitor both manual transfers and background auto-backups
-        // We use a combined approach to ensure all active CloudNest tasks are visible
-        
-        // Combine MANUAL_UPLOAD and AUTO_BACKUP tags for observation
-        workManager.getWorkInfosByTagLiveData("MANUAL_UPLOAD")
-                .observe(getViewLifecycleOwner(), workInfos -> updateQueueUI(workInfos, "AUTO_BACKUP"));
+        // Monitor manual transfers
+        workManager.getWorkInfosByTagLiveData("MANUAL_UPLOAD").observe(getViewLifecycleOwner(), manualInfos -> {
+            // Re-fetch auto-sync infos whenever manual list changes to maintain a combined view
+            fetchAndPopulateQueue(manualInfos);
+        });
+
+        // Monitor automatic backup transfers (Watcher triggered)
+        workManager.getWorkInfosByTagLiveData("AUTO_BACKUP").observe(getViewLifecycleOwner(), autoInfos -> {
+            // Re-fetch manual infos whenever auto list changes to maintain a combined view
+            fetchAndPopulateQueue(autoInfos);
+        });
     }
 
     /**
-     * Helper to process WorkInfo lists and merge results if necessary.
+     * Helper to process WorkInfo lists and merge results for the UI.
+     * This logic ensures that both Manual and Auto-Detection tasks appear in the same list.
      */
-    private void updateQueueUI(List<WorkInfo> manualInfos, String secondaryTag) {
-        workManager.getWorkInfosByTagLiveData(secondaryTag).observe(getViewLifecycleOwner(), autoInfos -> {
-            if (!isAdded() || binding == null) return;
+    private void fetchAndPopulateQueue(List<WorkInfo> updatedInfos) {
+        // We use the combined approach to ensure all active CloudNest tasks are visible
+        // regardless of which tag triggered the update.
+        
+        workManager.getWorkInfosByTagLiveData("MANUAL_UPLOAD").observe(getViewLifecycleOwner(), manualList -> {
+            workManager.getWorkInfosByTagLiveData("AUTO_BACKUP").observe(getViewLifecycleOwner(), autoList -> {
+                
+                if (!isAdded() || binding == null) return;
 
-            List<WorkInfo> combined = new ArrayList<>();
-            if (manualInfos != null) combined.addAll(manualInfos);
-            if (autoInfos != null) combined.addAll(autoInfos);
-
-            if (combined.isEmpty()) {
-                binding.tvEmptyQueue.setVisibility(View.VISIBLE);
-                binding.recyclerViewUploads.setVisibility(View.GONE);
-                adapter.updateList(new ArrayList<>());
-                return;
-            }
-
-            binding.tvEmptyQueue.setVisibility(View.GONE);
-            binding.recyclerViewUploads.setVisibility(View.VISIBLE);
-
-            // Convert WorkInfo objects to our UI Model
-            List<UploadItemModel> uiModels = new ArrayList<>();
-
-            for (WorkInfo info : combined) {
-                // FIXED GLITCH 2: Extract real-time speed and file details
-                String fileName = info.getProgress().getString("CURRENT_FILE");
-                if (fileName == null) fileName = "Syncing...";
-
-                int progress = info.getProgress().getInt("PROGRESS_PERCENT", 0);
-                String speed = info.getProgress().getString("SPEED");
-                String details = info.getProgress().getString("DETAILS");
-
-                // Determine task state for UI icons
-                UploadItemModel.Status status;
-                if (info.getState() == WorkInfo.State.RUNNING) {
-                    status = UploadItemModel.Status.IN_PROGRESS;
-                } else if (info.getState() == WorkInfo.State.SUCCEEDED) {
-                    status = UploadItemModel.Status.COMPLETED;
-                    progress = 100;
-                } else if (info.getState() == WorkInfo.State.FAILED) {
-                    status = UploadItemModel.Status.FAILED;
-                } else if (info.getState() == WorkInfo.State.CANCELLED) {
-                    status = UploadItemModel.Status.CANCELLED;
-                } else {
-                    status = UploadItemModel.Status.PENDING;
+                List<WorkInfo> combined = new ArrayList<>();
+                if (manualList != null) combined.addAll(manualList);
+                if (autoList != null) {
+                    for (WorkInfo autoInfo : autoList) {
+                        // Prevent duplicates if a task somehow has both tags
+                        boolean exists = false;
+                        for (WorkInfo manualInfo : combined) {
+                            if (manualInfo.getId().equals(autoInfo.getId())) {
+                                exists = true;
+                                break;
+                            }
+                        }
+                        if (!exists) combined.add(autoInfo);
+                    }
                 }
 
-                uiModels.add(new UploadItemModel(
-                        info.getId(),
-                        fileName,
-                        progress,
-                        status,
-                        speed,
-                        details
-                ));
-            }
+                if (combined.isEmpty()) {
+                    binding.tvEmptyQueue.setVisibility(View.VISIBLE);
+                    binding.recyclerViewUploads.setVisibility(View.GONE);
+                    adapter.updateList(new ArrayList<>());
+                    return;
+                }
 
-            // Update the adapter with merged data
-            adapter.updateList(uiModels);
+                binding.tvEmptyQueue.setVisibility(View.GONE);
+                binding.recyclerViewUploads.setVisibility(View.VISIBLE);
+
+                List<UploadItemModel> uiModels = new ArrayList<>();
+
+                for (WorkInfo info : combined) {
+                    String fileName = info.getProgress().getString("CURRENT_FILE");
+                    if (fileName == null) fileName = "Syncing...";
+
+                    int progress = info.getProgress().getInt("PROGRESS_PERCENT", 0);
+                    String speed = info.getProgress().getString("SPEED");
+                    String details = info.getProgress().getString("DETAILS");
+
+                    UploadItemModel.Status status;
+                    if (info.getState() == WorkInfo.State.RUNNING) {
+                        status = UploadItemModel.Status.IN_PROGRESS;
+                    } else if (info.getState() == WorkInfo.State.SUCCEEDED) {
+                        status = UploadItemModel.Status.COMPLETED;
+                        progress = 100;
+                    } else if (info.getState() == WorkInfo.State.FAILED) {
+                        status = UploadItemModel.Status.FAILED;
+                    } else if (info.getState() == WorkInfo.State.CANCELLED) {
+                        status = UploadItemModel.Status.CANCELLED;
+                    } else {
+                        status = UploadItemModel.Status.PENDING;
+                    }
+
+                    uiModels.add(new UploadItemModel(
+                            info.getId(),
+                            fileName,
+                            progress,
+                            status,
+                            speed,
+                            details
+                    ));
+                }
+
+                adapter.updateList(uiModels);
+            });
         });
     }
 
@@ -161,8 +182,6 @@ public class UploadManagerFragment extends Fragment implements UploadQueueAdapte
 
     @Override
     public void onRetryClicked(UUID workId) {
-        // WorkManager tasks are immutable once finished. 
-        // Instructions: Notify user to re-trigger since input data extraction is complex.
         Toast.makeText(requireContext(), "Please re-select items to retry upload.", Toast.LENGTH_LONG).show();
         workManager.pruneWork(); 
     }
