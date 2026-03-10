@@ -56,7 +56,7 @@ import java.util.concurrent.Executors;
  * - Creating Folders
  * - Deleting/Renaming Files
  * - "Make Available Offline" (Caching)
- * UPDATED: Fixed Glitch 1 (Thumbnails), Glitch 4 (In-app previewing), and Life-cycle Crashes.
+ * UPDATED: Fixed Glitch 1 (Thumbnails), Glitch 4 (In-app previewing), and Glitch 2 (Permanent Delete).
  */
 public class DriveBrowserFragment extends Fragment implements FileBrowserAdapter.OnFileItemClickListener {
 
@@ -306,24 +306,18 @@ public class DriveBrowserFragment extends Fragment implements FileBrowserAdapter
     }
 
     private void showContextMenu(FileItemModel file) {
-        CharSequence[] options = {"Make Available Offline", "Rename", "Delete", "Share Link"};
+        // UPDATED FOR GLITCH 2: Added Delete Permanently
+        CharSequence[] options = {"Make Available Offline", "Rename", "Delete (Trash)", "Delete Permanently", "Share Link"};
 
         new AlertDialog.Builder(requireContext())
                 .setTitle(file.getName())
                 .setItems(options, (dialog, which) -> {
                     switch (which) {
-                        case 0:
-                            downloadForOffline(file);
-                            break;
-                        case 1:
-                            showRenameDialog(file);
-                            break;
-                        case 2:
-                            confirmDelete(file);
-                            break;
-                        case 3:
-                            shareLink(file);
-                            break;
+                        case 0: downloadForOffline(file); break;
+                        case 1: showRenameDialog(file); break;
+                        case 2: confirmDelete(file); break;
+                        case 3: confirmPermanentDelete(file); break;
+                        case 4: shareLink(file); break;
                     }
                 })
                 .show();
@@ -443,6 +437,36 @@ public class DriveBrowserFragment extends Fragment implements FileBrowserAdapter
         });
     }
 
+    /**
+     * FIXED FOR GLITCH 2: Logic to permanently remove files from Drive.
+     */
+    private void confirmPermanentDelete(FileItemModel file) {
+        new AlertDialog.Builder(getContext())
+                .setTitle("Delete Permanently?")
+                .setMessage("Warning: '" + file.getName() + "' will be gone forever. This cannot be undone.")
+                .setPositiveButton("Delete Forever", (dialog, which) -> {
+                    performPermanentDelete(file.getDriveId());
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void performPermanentDelete(String fileId) {
+        networkExecutor.execute(() -> {
+            try {
+                DriveApiHelper.deleteFilePermanently(driveService, fileId);
+                if (isAdded()) {
+                    requireActivity().runOnUiThread(() -> {
+                        Toast.makeText(getContext(), "Permanently Deleted", Toast.LENGTH_SHORT).show();
+                        loadDriveFolder(currentFolderId, currentFolderName, false);
+                    });
+                }
+            } catch (IOException e) {
+                Log.e(TAG, "Permanent delete error", e);
+            }
+        });
+    }
+
     private void shareLink(FileItemModel file) {
         Intent shareIntent = new Intent(Intent.ACTION_SEND);
         shareIntent.setType("text/plain");
@@ -499,8 +523,9 @@ public class DriveBrowserFragment extends Fragment implements FileBrowserAdapter
         // Inflate a menu that adds "Create Folder" and "Toggle View"
         inflater.inflate(R.menu.browser_top_menu, menu);
         
-        // Add specific Drive options if needed
+        // FIXED FOR GLITCH 2: Added Empty Trash option
         menu.add(Menu.NONE, 100, Menu.NONE, "Create New Folder");
+        menu.add(Menu.NONE, 101, Menu.NONE, "Empty Trash");
         
         super.onCreateOptionsMenu(menu, inflater);
     }
@@ -512,11 +537,36 @@ public class DriveBrowserFragment extends Fragment implements FileBrowserAdapter
             setLayoutManager();
             adapter.setGridMode(isGridMode);
             return true;
-        } else if (item.getItemId() == 100) { // Create Folder ID
+        } else if (item.getItemId() == 100) { 
             showCreateFolderDialog();
+            return true;
+        } else if (item.getItemId() == 101) {
+            confirmEmptyTrash();
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private void confirmEmptyTrash() {
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Empty Drive Trash?")
+                .setMessage("This will permanently delete all items in your Google Drive trash folder.")
+                .setPositiveButton("Empty Now", (d, w) -> performEmptyTrash())
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void performEmptyTrash() {
+        networkExecutor.execute(() -> {
+            try {
+                DriveApiHelper.emptyTrash(driveService);
+                if (isAdded()) {
+                    requireActivity().runOnUiThread(() -> Toast.makeText(getContext(), "Trash Emptied", Toast.LENGTH_SHORT).show());
+                }
+            } catch (IOException e) {
+                Log.e(TAG, "Empty trash error", e);
+            }
+        });
     }
 
     @Override
