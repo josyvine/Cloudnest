@@ -40,7 +40,7 @@ import com.google.android.material.snackbar.Snackbar;
  * Main Host Activity for CloudNest.
  * Manages the Navigation Drawer, Floating Action Button (FAB),
  * Runtime Permissions, Back Button logic, and Global UI.
- * UPDATED: Fixed all remaining glitches and activated Sync Scheduler (Glitch 9).
+ * UPDATED: Integrated Trash Bin navigation (Glitch 2) and Folder Watcher (Glitch 1).
  */
 public class MainActivity extends AppCompatActivity {
 
@@ -78,6 +78,7 @@ public class MainActivity extends AppCompatActivity {
             navController = navHostFragment.getNavController();
 
             // Define top-level destinations
+            // UPDATED: Added R.id.nav_trash for Glitch 2
             appBarConfiguration = new AppBarConfiguration.Builder(
                     R.id.nav_dashboard, 
                     R.id.nav_phone_storage, 
@@ -86,7 +87,8 @@ public class MainActivity extends AppCompatActivity {
                     R.id.nav_upload_manager, 
                     R.id.nav_storage_graph,
                     R.id.nav_preset_folders, 
-                    R.id.nav_drive_accounts)
+                    R.id.nav_drive_accounts,
+                    R.id.nav_trash) 
                     .setOpenableLayout(drawer)
                     .build();
 
@@ -95,7 +97,8 @@ public class MainActivity extends AppCompatActivity {
 
             // Hide/Show FAB based on fragment destination to prevent overlap
             navController.addOnDestinationChangedListener((controller, destination, arguments) -> {
-                if (destination.getId() == R.id.nav_preset_folders || destination.getId() == R.id.nav_drive_accounts) {
+                int id = destination.getId();
+                if (id == R.id.nav_preset_folders || id == R.id.nav_drive_accounts || id == R.id.nav_trash) {
                     binding.fab.hide();
                 } else {
                     binding.fab.show();
@@ -109,6 +112,13 @@ public class MainActivity extends AppCompatActivity {
 
             if (id == R.id.nav_logout) {
                 confirmAndLogout();
+                return true;
+            }
+
+            // FIXED FOR GLITCH 2: Navigation logic for Trash bin
+            if (id == R.id.nav_trash) {
+                navController.navigate(R.id.nav_trash);
+                drawer.closeDrawer(GravityCompat.START);
                 return true;
             }
 
@@ -129,11 +139,9 @@ public class MainActivity extends AppCompatActivity {
         checkRuntimePermissions();
 
         // FIXED FOR GLITCH 9: ACTIVATE THE AUTO-BACKUP SCHEDULER
-        // This ensures background syncs are registered with the system on startup.
         SyncScheduler.refreshAllSchedules(this);
 
         // FIXED FOR GLITCH 1: START THE REAL-TIME FOLDER WATCHER SERVICE
-        // This service monitors folders for new files and triggers sync immediately.
         FolderWatcherService.startService(this);
     }
 
@@ -216,8 +224,6 @@ public class MainActivity extends AppCompatActivity {
         builder.setPositiveButton("Create", (dialog, which) -> {
             String folderName = input.getText().toString().trim();
             if (!folderName.isEmpty()) {
-                // To create folder on Drive, user should use the Drive Browser or Folder Selector Dialog.
-                // This logic handles a generic placeholder for local creation.
                 Toast.makeText(this, "Triggering creation for: " + folderName, Toast.LENGTH_SHORT).show();
             }
         });
@@ -243,7 +249,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void checkRuntimePermissions() {
-        // Handle Storage Permissions (Android 11+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (!Environment.isExternalStorageManager()) {
                 showStoragePermissionExplanation();
@@ -257,7 +262,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        // Handle Notification Permissions (Android 13+ / Fixes Glitch 8)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, PERMISSION_REQUEST_CODE);
