@@ -15,13 +15,14 @@ import android.util.Log;
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Foreground Service that monitors Preset Folders in real-time.
- * Uses FileObserver to detect new files and trigger instant sync.
- * FIXES: Glitch 1 (Automatic detection of new files).
+ * UPDATED: Implemented Recursive Observation to detect changes in subfolders 
+ * and specific system directories like DCIM/Screenshots.
  */
 public class FolderWatcherService extends Service {
 
@@ -98,11 +99,37 @@ public class FolderWatcherService extends Service {
         }).start();
     }
 
+    /**
+     * UPDATED: Now triggers a recursive registration.
+     * It ensures the main folder and ALL existing subfolders are monitored.
+     */
     private void startWatchingFolder(PresetFolderEntity folder) {
-        Log.d(TAG, "Starting watcher for: " + folder.localPath);
-        CustomFileObserver observer = new CustomFileObserver(folder);
+        File root = new File(folder.localPath);
+        if (!root.exists() || !root.isDirectory()) return;
+
+        Log.d(TAG, "Starting recursive watcher for: " + folder.localPath);
+        registerRecursive(root, folder);
+    }
+
+    /**
+     * Helper method to "walk" the directory tree.
+     * Standard FileObserver is not recursive; we must manually attach to every subdirectory.
+     */
+    private void registerRecursive(File file, PresetFolderEntity preset) {
+        // Register the current directory
+        CustomFileObserver observer = new CustomFileObserver(file.getAbsolutePath(), preset);
         observer.startWatching();
         observers.add(observer);
+
+        // Register all subdirectories
+        File[] list = file.listFiles();
+        if (list != null) {
+            for (File f : list) {
+                if (f.isDirectory() && !f.getName().startsWith(".")) {
+                    registerRecursive(f, preset);
+                }
+            }
+        }
     }
 
     private void stopAllObservers() {
@@ -143,15 +170,27 @@ public class FolderWatcherService extends Service {
      */
     private class CustomFileObserver extends FileObserver {
         private final PresetFolderEntity folder;
+        private final String absolutePath;
 
-        public CustomFileObserver(PresetFolderEntity folder) {
-            super(folder.localPath, FileObserver.CREATE | FileObserver.MOVED_TO | FileObserver.CLOSE_WRITE);
+        public CustomFileObserver(String path, PresetFolderEntity folder) {
+            // Flags: CREATE, MOVED_TO, and CLOSE_WRITE cover standard saves and screenshot system behaviors.
+            super(path, FileObserver.CREATE | FileObserver.MOVED_TO | FileObserver.CLOSE_WRITE);
             this.folder = folder;
+            this.absolutePath = path;
         }
 
         @Override
         public void onEvent(int event, @Nullable String path) {
             if (path == null) return;
+
+            // If a new directory is created inside a watched folder, we should watch it too
+            // Note: This check is for real-time dynamic subfolder creation.
+            if ((event & FileObserver.CREATE) != 0) {
+                File newFile = new File(absolutePath, path);
+                if (newFile.isDirectory()) {
+                    registerRecursive(newFile, folder);
+                }
+            }
 
             Log.d(TAG, "File change detected in " + folder.folderName + ": " + path);
             
