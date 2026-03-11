@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Utility class to manage background scheduling for Preset Folders.
  * This ensures that folders are scanned for new files automatically.
- * UPDATED: Fixed Tag Mismatch for Upload Manager visibility and improved Enqueue Policy.
+ * UPDATED: Optimized for recursive triggers and immediate system-folder detection.
  */
 public class SyncScheduler {
 
@@ -25,6 +25,7 @@ public class SyncScheduler {
 
     /**
      * Schedules a periodic background sync (every 1 hour) for a specific preset folder.
+     * This acts as a safety net to ensure all files are synced even if a real-time event was missed.
      */
     public static void scheduleFolderSync(Context context, PresetFolderEntity folder) {
         Constraints constraints = new Constraints.Builder()
@@ -55,9 +56,9 @@ public class SyncScheduler {
     }
 
     /**
-     * NEW: Triggers an IMMEDIATE sync for a folder.
+     * Triggers an IMMEDIATE sync for a folder.
      * Logic for Glitch 1: Called by FolderWatcherService when a new file is detected.
-     * UPDATED: Changed tag to AUTO_BACKUP for UI visibility and policy to APPEND_OR_REPLACE.
+     * UPDATED: Using APPEND_OR_REPLACE to handle rapid subfolder changes without cancelling active tasks.
      */
     public static void triggerImmediateSync(Context context, PresetFolderEntity folder) {
         Data inputData = new Data.Builder()
@@ -67,10 +68,11 @@ public class SyncScheduler {
 
         OneTimeWorkRequest instantRequest = new OneTimeWorkRequest.Builder(AutoBackupWorker.class)
                 .setInputData(inputData)
-                .addTag("AUTO_BACKUP") // Changed from AUTO_BACKUP_INSTANT to match UI observer
+                .addTag("AUTO_BACKUP")
                 .build();
 
-        // APPEND_OR_REPLACE ensures that new file detections don't cancel an active upload
+        // UniqueWork with APPEND_OR_REPLACE ensures that if multiple files are added 
+        // to subfolders quickly, the requests are queued up rather than dropped.
         WorkManager.getInstance(context).enqueueUniqueWork(
                 "INSTANT_" + folder.id,
                 ExistingWorkPolicy.APPEND_OR_REPLACE,
@@ -89,8 +91,8 @@ public class SyncScheduler {
     }
 
     /**
-     * FIXED LOGIC: Loops through all presets in the database and ensures they are scheduled.
-     * Logic for Glitch 1: Called in MainActivity to start the system.
+     * Loops through all presets in the database and ensures they are scheduled.
+     * Called in MainActivity to start the system and the Watcher service.
      */
     public static void refreshAllSchedules(Context context) {
         CloudNestDatabase db = CloudNestDatabase.getInstance(context);
@@ -107,7 +109,7 @@ public class SyncScheduler {
                     }
                 }
                 
-                // FIXED FOR GLITCH 1: Also start the Instant Watcher Service
+                // Start the Instant Watcher Service to monitor real-time changes
                 FolderWatcherService.startService(context);
                 
             } catch (Exception e) {
