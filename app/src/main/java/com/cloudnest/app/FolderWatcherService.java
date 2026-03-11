@@ -198,4 +198,4 @@ public class FolderWatcherService extends Service {
             SyncScheduler.triggerImmediateSync(getApplicationContext(), folder);
         }
     }
-}
+} 
