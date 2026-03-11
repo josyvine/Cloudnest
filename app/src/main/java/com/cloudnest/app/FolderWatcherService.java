@@ -23,7 +23,6 @@ import java.util.List;
  * Foreground Service that monitors Preset Folders in real-time.
  * Uses FileObserver to detect new files and trigger instant sync.
  * FIXES: Glitch 1 (Automatic detection of new files).
- * UPDATED: Added Recursive watching for Subfolders, DCIM, and Screenshots.
  */
 public class FolderWatcherService extends Service {
 
@@ -94,39 +93,31 @@ public class FolderWatcherService extends Service {
             List<PresetFolderEntity> presets = db.presetFolderDao().getAllPresetsSync();
             if (presets != null) {
                 for (PresetFolderEntity folder : presets) {
-                    startWatchingFolder(folder);
+                    startWatchingFolderRecursive(folder, folder.localPath);
                 }
             }
         }).start();
     }
 
     /**
-     * Starts watching the folder and all its subdirectories recursively.
-     * This fixes detection for DCIM/Camera and Screenshots.
+     * New helper method to ensure subfolders (like Screenshots and Copy Folder subdirs) are watched.
      */
-    private void startWatchingFolder(PresetFolderEntity folder) {
-        Log.d(TAG, "Starting recursive watcher for: " + folder.localPath);
-        startWatchingRecursive(folder, folder.localPath);
-    }
+    private void startWatchingFolderRecursive(PresetFolderEntity folder, String path) {
+        File dir = new File(path);
+        if (!dir.exists() || !dir.isDirectory()) return;
 
-    /**
-     * Internal helper to crawl through subfolders and attach observers.
-     */
-    private void startWatchingRecursive(PresetFolderEntity folder, String path) {
-        File root = new File(path);
-        if (!root.exists() || !root.isDirectory()) return;
-
-        // 1. Attach observer to the current directory
+        // Start watching the current folder (same logic as lunartag)
+        Log.d(TAG, "Starting watcher for: " + path);
         CustomFileObserver observer = new CustomFileObserver(folder, path);
         observer.startWatching();
         observers.add(observer);
 
-        // 2. Find subdirectories and watch them too
-        File[] children = root.listFiles();
-        if (children != null) {
-            for (File child : children) {
-                if (child.isDirectory() && !child.getName().startsWith(".")) {
-                    startWatchingRecursive(folder, child.getAbsolutePath());
+        // Walk through subfolders to catch files in folder1, folder2, DCIM/Screenshots, etc.
+        File[] subDirs = dir.listFiles();
+        if (subDirs != null) {
+            for (File subDir : subDirs) {
+                if (subDir.isDirectory() && !subDir.getName().startsWith(".")) {
+                    startWatchingFolderRecursive(folder, subDir.getAbsolutePath());
                 }
             }
         }
@@ -170,22 +161,19 @@ public class FolderWatcherService extends Service {
      */
     private class CustomFileObserver extends FileObserver {
         private final PresetFolderEntity folder;
-        private final String watchPath;
+        private final String path;
 
         public CustomFileObserver(PresetFolderEntity folder, String path) {
-            // We use the specific subfolder path provided by the recursion
             super(path, FileObserver.CREATE | FileObserver.MOVED_TO | FileObserver.CLOSE_WRITE);
             this.folder = folder;
-            this.watchPath = path;
+            this.path = path;
         }
 
         @Override
-        public void onEvent(int event, @Nullable String path) {
-            if (path == null) return;
+        public void onEvent(int event, @Nullable String fileName) {
+            if (fileName == null) return;
 
-            // If a new directory is created inside, we should ideally watch that too.
-            // But for now, triggering the sync will catch all new files.
-            Log.d(TAG, "File change detected in " + watchPath + ": " + path);
+            Log.d(TAG, "File change detected in " + path + ": " + fileName);
             
             // Trigger the SyncScheduler to start the AutoBackupWorker immediately
             SyncScheduler.triggerImmediateSync(getApplicationContext(), folder);
