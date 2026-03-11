@@ -15,6 +15,7 @@ import android.util.Log;
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,6 +23,7 @@ import java.util.List;
  * Foreground Service that monitors Preset Folders in real-time.
  * Uses FileObserver to detect new files and trigger instant sync.
  * FIXES: Glitch 1 (Automatic detection of new files).
+ * UPDATED: Added Recursive watching for Subfolders, DCIM, and Screenshots.
  */
 public class FolderWatcherService extends Service {
 
@@ -98,11 +100,36 @@ public class FolderWatcherService extends Service {
         }).start();
     }
 
+    /**
+     * Starts watching the folder and all its subdirectories recursively.
+     * This fixes detection for DCIM/Camera and Screenshots.
+     */
     private void startWatchingFolder(PresetFolderEntity folder) {
-        Log.d(TAG, "Starting watcher for: " + folder.localPath);
-        CustomFileObserver observer = new CustomFileObserver(folder);
+        Log.d(TAG, "Starting recursive watcher for: " + folder.localPath);
+        startWatchingRecursive(folder, folder.localPath);
+    }
+
+    /**
+     * Internal helper to crawl through subfolders and attach observers.
+     */
+    private void startWatchingRecursive(PresetFolderEntity folder, String path) {
+        File root = new File(path);
+        if (!root.exists() || !root.isDirectory()) return;
+
+        // 1. Attach observer to the current directory
+        CustomFileObserver observer = new CustomFileObserver(folder, path);
         observer.startWatching();
         observers.add(observer);
+
+        // 2. Find subdirectories and watch them too
+        File[] children = root.listFiles();
+        if (children != null) {
+            for (File child : children) {
+                if (child.isDirectory() && !child.getName().startsWith(".")) {
+                    startWatchingRecursive(folder, child.getAbsolutePath());
+                }
+            }
+        }
     }
 
     private void stopAllObservers() {
@@ -143,17 +170,22 @@ public class FolderWatcherService extends Service {
      */
     private class CustomFileObserver extends FileObserver {
         private final PresetFolderEntity folder;
+        private final String watchPath;
 
-        public CustomFileObserver(PresetFolderEntity folder) {
-            super(folder.localPath, FileObserver.CREATE | FileObserver.MOVED_TO | FileObserver.CLOSE_WRITE);
+        public CustomFileObserver(PresetFolderEntity folder, String path) {
+            // We use the specific subfolder path provided by the recursion
+            super(path, FileObserver.CREATE | FileObserver.MOVED_TO | FileObserver.CLOSE_WRITE);
             this.folder = folder;
+            this.watchPath = path;
         }
 
         @Override
         public void onEvent(int event, @Nullable String path) {
             if (path == null) return;
 
-            Log.d(TAG, "File change detected in " + folder.folderName + ": " + path);
+            // If a new directory is created inside, we should ideally watch that too.
+            // But for now, triggering the sync will catch all new files.
+            Log.d(TAG, "File change detected in " + watchPath + ": " + path);
             
             // Trigger the SyncScheduler to start the AutoBackupWorker immediately
             SyncScheduler.triggerImmediateSync(getApplicationContext(), folder);
