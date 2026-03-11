@@ -22,7 +22,7 @@ import java.util.List;
 /**
  * Foreground Service that monitors Preset Folders in real-time.
  * Uses FileObserver to detect new files and trigger instant sync.
- * FIXES: Glitch 1 (Automatic detection of new files).
+ * FIXES: Added recursive monitoring to detect files in subfolders (folder1, folder2, Screenshots).
  */
 public class FolderWatcherService extends Service {
 
@@ -93,31 +93,32 @@ public class FolderWatcherService extends Service {
             List<PresetFolderEntity> presets = db.presetFolderDao().getAllPresetsSync();
             if (presets != null) {
                 for (PresetFolderEntity folder : presets) {
-                    startWatchingFolderRecursive(folder, folder.localPath);
+                    // Start watching the root folder and all its subdirectories
+                    startWatchingRecursive(folder, folder.localPath);
                 }
             }
         }).start();
     }
 
     /**
-     * New helper method to ensure subfolders (like Screenshots and Copy Folder subdirs) are watched.
+     * Recursively attaches observers to the main folder and all subfolders.
+     * This ensures folder1, folder2, and Screenshot subdirs are all detected.
      */
-    private void startWatchingFolderRecursive(PresetFolderEntity folder, String path) {
-        File dir = new File(path);
-        if (!dir.exists() || !dir.isDirectory()) return;
+    private void startWatchingRecursive(PresetFolderEntity folder, String path) {
+        File directory = new File(path);
+        if (!directory.exists() || !directory.isDirectory()) return;
 
-        // Start watching the current folder (same logic as lunartag)
-        Log.d(TAG, "Starting watcher for: " + path);
+        // Attach observer to this specific path
         CustomFileObserver observer = new CustomFileObserver(folder, path);
         observer.startWatching();
         observers.add(observer);
 
-        // Walk through subfolders to catch files in folder1, folder2, DCIM/Screenshots, etc.
-        File[] subDirs = dir.listFiles();
-        if (subDirs != null) {
-            for (File subDir : subDirs) {
-                if (subDir.isDirectory() && !subDir.getName().startsWith(".")) {
-                    startWatchingFolderRecursive(folder, subDir.getAbsolutePath());
+        // Scan for subdirectories and watch them too
+        File[] files = directory.listFiles();
+        if (files != null) {
+            for (File f : files) {
+                if (f.isDirectory() && !f.getName().startsWith(".")) {
+                    startWatchingRecursive(folder, f.getAbsolutePath());
                 }
             }
         }
@@ -158,22 +159,23 @@ public class FolderWatcherService extends Service {
 
     /**
      * Internal class to handle File system events.
+     * Updated to support specific paths for recursive monitoring.
      */
     private class CustomFileObserver extends FileObserver {
         private final PresetFolderEntity folder;
-        private final String path;
+        private final String watchPath;
 
         public CustomFileObserver(PresetFolderEntity folder, String path) {
             super(path, FileObserver.CREATE | FileObserver.MOVED_TO | FileObserver.CLOSE_WRITE);
             this.folder = folder;
-            this.path = path;
+            this.watchPath = path;
         }
 
         @Override
         public void onEvent(int event, @Nullable String fileName) {
             if (fileName == null) return;
 
-            Log.d(TAG, "File change detected in " + path + ": " + fileName);
+            Log.d(TAG, "File change detected in " + watchPath + ": " + fileName);
             
             // Trigger the SyncScheduler to start the AutoBackupWorker immediately
             SyncScheduler.triggerImmediateSync(getApplicationContext(), folder);
