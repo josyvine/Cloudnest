@@ -81,16 +81,17 @@ public interface FileTrackDao {
      * For a specific drive, it groups all tracked files by their parent preset folder
      * and calculates the sequence range, total file count, and total size.
      * It joins with the preset_folders table to get the folder_name.
+     * UPDATED: Changed to LEFT JOIN and COALESCE to include manual uploads.
      */
     @Query("SELECT " +
            "    t.preset_id, " +
-           "    p.folder_name, " +
+           "    COALESCE(p.folder_name, 'Manual Upload') as folder_name, " +
            "    MIN(t.sequence_number) as start_sequence, " +
            "    MAX(t.sequence_number) as end_sequence, " +
            "    COUNT(t.id) as total_files, " +
            "    SUM(t.file_size) as total_size " +
            "FROM file_tracking t " +
-           "JOIN preset_folders p ON t.preset_id = p.id " +
+           "LEFT JOIN preset_folders p ON t.preset_id = p.id " +
            "WHERE t.drive_account_id = :driveAccountId " +
            "GROUP BY t.preset_id, p.folder_name " +
            "ORDER BY p.folder_name ASC")
