@@ -93,7 +93,7 @@ public class UploadWorker extends Worker {
             // 3. Process Uploads
             for (String path : filePaths) {
                 if (isStopped()) return Result.success(); // Respect cancellation
-                processAndUpload(new java.io.File(path), destinationId);
+                processAndUpload(new java.io.File(path), destinationId, account.getEmail());
             }
 
             NotificationHelper.showUploadComplete(getApplicationContext(), totalFiles);
@@ -118,7 +118,7 @@ public class UploadWorker extends Worker {
         }
     }
 
-    private void processAndUpload(java.io.File localFile, String parentFolderId) throws IOException {
+    private void processAndUpload(java.io.File localFile, String parentFolderId, String accountEmail) throws IOException {
         if (isStopped()) return;
 
         if (localFile.isDirectory()) {
@@ -135,7 +135,7 @@ public class UploadWorker extends Worker {
             java.io.File[] children = localFile.listFiles();
             if (children != null) {
                 for (java.io.File child : children) {
-                    processAndUpload(child, folderId);
+                    processAndUpload(child, folderId, accountEmail);
                 }
             }
         } else {
@@ -144,7 +144,8 @@ public class UploadWorker extends Worker {
             if (driveId != null) {
                 // Manual uploads use a presetId of -1 to distinguish from Auto-Backup
                 int seqNum = tracker.getNextSequenceNumber(-1);
-                tracker.trackFileUpload(localFile.getAbsolutePath(), seqNum, "user@gmail.com", driveId, -1, localFile.length());
+                // FIXED: Tracking with actual dynamic accountEmail instead of hardcoded string
+                tracker.trackFileUpload(localFile.getAbsolutePath(), seqNum, accountEmail, driveId, -1, localFile.length());
             }
             // -------------------------------------
         }
