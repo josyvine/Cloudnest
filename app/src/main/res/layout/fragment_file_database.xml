@@ -18,8 +18,7 @@
         android:id="@+id/spinner_drive_selector"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="8dp"
-        android:background="?android:attr/spinnerDropDownItemStyle" />
+        android:padding="8dp" />
 
     <View
         android:layout_width="match_parent"
