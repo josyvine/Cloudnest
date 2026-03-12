@@ -19,6 +19,7 @@ import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.DriveScopes;
 import com.google.api.services.drive.model.File;
+import com.google.api.services.drive.model.FileList;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -28,6 +29,7 @@ import java.util.Collections;
  * Handles recursive file scanning and uploading to Google Drive.
  * UPDATED: Added real-time speed calculation, precise progress tracking, 
  * destination folder support, and OS Notifications.
+ * UPDATED: Added SequenceTrackerHelper for Visual Ledger tracking.
  */
 public class UploadWorker extends Worker {
 
@@ -35,6 +37,9 @@ public class UploadWorker extends Worker {
     private Drive driveService;
     private int totalFiles = 0;
     private int uploadedFiles = 0;
+    
+    // --- ENHANCEMENT ADDITION ---
+    private SequenceTrackerHelper tracker;
 
     // Speed Tracking
     private long startTime;
@@ -44,6 +49,8 @@ public class UploadWorker extends Worker {
 
     public UploadWorker(@NonNull Context context, @NonNull WorkerParameters workerParams) {
         super(context, workerParams);
+        // --- ENHANCEMENT ADDITION ---
+        tracker = new SequenceTrackerHelper(context);
     }
 
     @NonNull
@@ -132,12 +139,19 @@ public class UploadWorker extends Worker {
                 }
             }
         } else {
-            uploadSingleFile(localFile, parentFolderId);
+            // --- ENHANCEMENT ADDITION: TRACKING ---
+            String driveId = uploadSingleFile(localFile, parentFolderId);
+            if (driveId != null) {
+                // Manual uploads use a presetId of -1 to distinguish from Auto-Backup
+                int seqNum = tracker.getNextSequenceNumber(-1);
+                tracker.trackFileUpload(localFile.getAbsolutePath(), seqNum, "user@gmail.com", driveId, -1, localFile.length());
+            }
+            // -------------------------------------
         }
     }
 
-    private void uploadSingleFile(java.io.File localFile, String parentFolderId) throws IOException {
-        if (isStopped()) return;
+    private String uploadSingleFile(java.io.File localFile, String parentFolderId) throws IOException {
+        if (isStopped()) return null;
 
         File fileMeta = new File();
         fileMeta.setName(localFile.getName());
@@ -158,8 +172,9 @@ public class UploadWorker extends Worker {
             }
         });
 
-        createRequest.setFields("id").execute();
+        File uploadedFile = createRequest.setFields("id").execute();
         uploadedFiles++;
+        return uploadedFile.getId();
     }
 
     private void calculateSpeed(long bytesUploaded) {
