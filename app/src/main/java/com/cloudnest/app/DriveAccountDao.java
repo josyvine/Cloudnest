@@ -14,6 +14,7 @@ import java.util.List;
  * Data Access Object (DAO) for DriveAccountEntity.
  * Defines all the database query methods needed for managing multiple
  * Google Drive accounts for the "Drive Cycling" feature.
+ * UPDATED: Added query to fetch the next available drive when one is full.
  */
 @Dao
 public interface DriveAccountDao {
@@ -76,4 +77,12 @@ public interface DriveAccountDao {
      */
     @Query("SELECT * FROM drive_accounts WHERE is_active = 1 AND is_full = 0 LIMIT 1")
     DriveAccountEntity getActiveAccount();
+
+    /**
+     * --- ENHANCEMENT: FIX FOR GLITCH ---
+     * Finds the next available account that is not full.
+     * This is used by the Workers when the current drive hits the limit.
+     */
+    @Query("SELECT * FROM drive_accounts WHERE is_full = 0 AND email != :currentEmail LIMIT 1")
+    DriveAccountEntity getNextAvailableAccount(String currentEmail);
 }
