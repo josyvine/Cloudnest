@@ -38,6 +38,7 @@ public class AutoBackupWorker extends Worker {
     private CloudNestDatabase db;
     private SequenceTrackerHelper tracker;
     private long currentPresetId;
+    private String uploaderEmail; // Added to hold dynamic email
 
     // Progress Tracking
     private int totalFilesToSync = 0;
@@ -163,7 +164,8 @@ public class AutoBackupWorker extends Worker {
                         String driveId = uploadFileWithProgress(item, driveFolderId);
                         if (driveId != null) {
                             int seqNum = tracker.getNextSequenceNumber(currentPresetId);
-                            tracker.trackFileUpload(item.getAbsolutePath(), seqNum, "user@gmail.com", driveId, currentPresetId, item.length());
+                            // Fixed: Using dynamic uploaderEmail
+                            tracker.trackFileUpload(item.getAbsolutePath(), seqNum, uploaderEmail, driveId, currentPresetId, item.length());
                         }
                         currentlySyncingIndex++;
                     }
@@ -180,6 +182,8 @@ public class AutoBackupWorker extends Worker {
             driveService = null;
             return;
         }
+        
+        uploaderEmail = account.getEmail(); // Retrieve the email here
 
         GoogleAccountCredential credential = GoogleAccountCredential.usingOAuth2(
                 getApplicationContext(), Collections.singleton(DriveScopes.DRIVE_FILE));
