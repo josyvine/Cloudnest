@@ -15,7 +15,6 @@ import java.util.List;
  * Adapter for the Visual Ledger.
  * Displays Preset Folders as expandable list items.
  * Clicking a parent row expands it to show detailed sequence and size metrics.
- * UPDATED: Corrected field access to match FileTrackDao.LedgerReportModel public members.
  */
 public class LedgerExpandableAdapter extends RecyclerView.Adapter<LedgerExpandableAdapter.ViewHolder> {
 
@@ -45,11 +44,11 @@ public class LedgerExpandableAdapter extends RecyclerView.Adapter<LedgerExpandab
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         FileTrackDao.LedgerReportModel item = ledgerList.get(position);
 
-        // Bind data using direct public field access as defined in FileTrackDao
-        holder.tvFolderName.setText(item.folder_name);
-        holder.tvSeqRange.setText("Files " + item.start_sequence + " to " + item.end_sequence);
-        holder.tvFileCount.setText(item.total_files + " files");
-        holder.tvTotalSize.setText(LocalFileHelper.getReadableSize(item.total_size));
+        // FIXED: Changed snake_case to camelCase to match the LedgerReportModel variables
+        holder.tvFolderName.setText(item.folderName);
+        holder.tvSeqRange.setText("Files " + item.startSequence + " to " + item.endSequence);
+        holder.tvFileCount.setText(item.totalFiles + " files");
+        holder.tvTotalSize.setText(LocalFileHelper.getReadableSize(item.totalSize));
 
         // Toggle visibility based on expansion
         boolean isExpanded = position == expandedPosition;
@@ -85,4 +84,4 @@ public class LedgerExpandableAdapter extends RecyclerView.Adapter<LedgerExpandab
             tvTotalSize = v.findViewById(R.id.tv_ledger_total_size);
         }
     }
-} 
+}
