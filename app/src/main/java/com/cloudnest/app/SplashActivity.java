@@ -19,17 +19,23 @@ import com.google.android.gms.common.api.Scope;
 import com.google.android.gms.tasks.Task;
 import com.google.api.services.drive.DriveScopes;
 
+// --- ENHANCEMENT: Imports for Database Sync ---
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
  * Entry point of the CloudNest Application (Landing Screen).
  * Handles Google OAuth 2.0 Authentication.
  * If the user is already authenticated, it redirects immediately to the Dashboard.
+ * UPDATED: Added background database sync to ensure logged-in accounts appear in the Ledger.
  */
 public class SplashActivity extends AppCompatActivity {
 
     private GoogleSignInClient googleSignInClient;
     private ActivityResultLauncher<Intent> driveSignInLauncher;
+    
+    // --- ENHANCEMENT: Database Executor ---
+    private final ExecutorService dbExecutor = Executors.newSingleThreadExecutor();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,8 +48,7 @@ public class SplashActivity extends AppCompatActivity {
         GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
         if (account != null && GoogleSignIn.hasPermissions(account, getRequiredScopes())) {
             // User is authenticated and has given permissions, skip landing screen
-            // --- FIXED: Ensure the logged-in account is saved to the local database ---
-            saveAccountToDatabase(account);
+            syncAccountToDatabase(account); // Sync before navigating
             navigateToMain();
             return;
         }
@@ -124,10 +129,8 @@ public class SplashActivity extends AppCompatActivity {
                             getRequiredScopes()
                     );
                 } else {
-                    // Success! Proceed to the main app dashboard.
-                    // --- FIXED: Save account to database upon successful login ---
-                    saveAccountToDatabase(account);
-                    
+                    // Success! Sync to DB and proceed.
+                    syncAccountToDatabase(account);
                     Toast.makeText(this, "Welcome to CloudNest, " + account.getGivenName(), Toast.LENGTH_SHORT).show();
                     navigateToMain();
                 }
@@ -139,32 +142,19 @@ public class SplashActivity extends AppCompatActivity {
     }
 
     /**
-     * Helper method to save the Google account to the local Room database.
-     * This ensures the Ledger has an account to display.
+     * --- ENHANCEMENT: Helper to sync session to Room Database ---
      */
-    private void saveAccountToDatabase(GoogleSignInAccount account) {
-        if (account == null || account.getEmail() == null) {
-            return;
-        }
-        
-        String email = account.getEmail();
-        String name = account.getDisplayName();
-
-        Executors.newSingleThreadExecutor().execute(() -> {
-            CloudNestDatabase db = CloudNestDatabase.getInstance(getApplicationContext());
-            // Only insert if it doesn't already exist to avoid duplicates
-            if (db.driveAccountDao().getAccountByEmail(email) == null) {
-                DriveAccountEntity newAccount = new DriveAccountEntity();
-                newAccount.email = email;
-                newAccount.displayName = name != null ? name : "Google Drive User";
-                // If it's the first account, make it active by default
-                if (db.driveAccountDao().getAccountCount() == 0) {
-                    newAccount.isActive = true;
-                } else {
-                    newAccount.isActive = false;
-                }
-                newAccount.isFull = false;
-                db.driveAccountDao().insert(newAccount);
+    private void syncAccountToDatabase(GoogleSignInAccount account) {
+        dbExecutor.execute(() -> {
+            CloudNestDatabase db = CloudNestDatabase.getInstance(this);
+            DriveAccountEntity existing = db.driveAccountDao().getAccountByEmail(account.getEmail());
+            if (existing == null) {
+                DriveAccountEntity newAcc = new DriveAccountEntity();
+                newAcc.email = account.getEmail();
+                newAcc.displayName = account.getDisplayName() != null ? account.getDisplayName() : "User";
+                newAcc.isActive = true;
+                newAcc.isFull = false;
+                db.driveAccountDao().insert(newAcc);
             }
         });
     }
@@ -174,9 +164,7 @@ public class SplashActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == 1001) {
             if (resultCode == RESULT_OK) {
-                // Permissions granted via fallback, ensure account is saved
-                GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
-                saveAccountToDatabase(account);
+                // Permissions granted via fallback
                 navigateToMain();
             } else {
                 Toast.makeText(this, "Drive permissions are required to use CloudNest.", Toast.LENGTH_LONG).show();
@@ -191,5 +179,11 @@ public class SplashActivity extends AppCompatActivity {
         Intent intent = new Intent(SplashActivity.this, MainActivity.class);
         startActivity(intent);
         finish();
+    }
+    
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        dbExecutor.shutdown();
     }
 }
